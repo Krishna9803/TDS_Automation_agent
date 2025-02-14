@@ -101,10 +101,15 @@ app.add_middleware(
 )
 
 # WARNING: Hardcoding AIPROXY_TOKEN is not recommended in production
-AIPROXY_TOKEN = (
-    "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjIxZjIwMDEzMDZAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9."
-    "0mcAComQBqT3Gewe3bQoD1rFmoyLgCrM9cbNa8JNeJM"
-)
+# AIPROXY_TOKEN = (
+#     "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjIxZjIwMDEzMDZAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9."
+#     "0mcAComQBqT3Gewe3bQoD1rFmoyLgCrM9cbNa8JNeJM"
+# )
+AIPROXY_TOKEN = os.environ.get("AIPROXY_TOKEN") 
+if not AIPROXY_TOKEN: 
+    raise RuntimeError("AIPROXY_TOKEN environment variable is missing!")
+
+
 
 @app.post("/run")
 def run_task(
