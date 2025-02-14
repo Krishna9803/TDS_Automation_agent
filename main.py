@@ -145,6 +145,17 @@ def run_task(
         "Your output must be **only the 16 digits**, with **no spaces**, and no other text or numbers."
         "9) Find the most similar pair of comments in /data/comments.txt using embeddings (comments_similarity)\n"
         "10) Sum sales for the 'Gold' ticket type from /data/ticket-sales.db (ticket_sales_gold)\n"
+        "You can also do the following\n"
+        "1) Run Python scripts with UV (script_runner)\n"
+        "B3) Fetch data from an API and save it (fetch_data_api)\n"
+        "B4) Clone a git repo and make a commit (clone_git_repo)\n"
+        "B5) Run a SQL query on a SQLite or DuckDB database (sql_query)\n"
+        "B6) Extract/scrape data from a website (scrape_website)\n"
+        "B7) Compress or resize an image (compress_image)\n"
+        "B8) Transcribe audio from MP3 (transcribe_audio)\n"
+        "B9) Convert Markdown to HTML (md_to_html)\n"
+        "B10) Write an API endpoint that filters a CSV file and returns JSON (filter_csv_endpoint)\n"
+        "Remember: data outside /data must not be accessed, data must never be deleted.\n"
     )
     user_message = task
     if user_email:
@@ -327,6 +338,146 @@ def run_task(
                         "required": ["db_path", "file_out"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fetch_data_api",
+                    "description": (
+                        "Fetch data from an API endpoint and save it to a file."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string"},
+                            "file_out": {"type": "string"}
+                        },
+                        "required": ["url", "file_out"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "clone_git_repo",
+                    "description": (
+                        "Clone a git repo and optionally make a commit."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "repo_url": {"type": "string"},
+                            "commit_message": {"type": "string"}
+                        },
+                        "required": ["repo_url"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "sql_query",
+                    "description": (
+                        "Run a SQL query on a SQLite or DuckDB database, write results to file_out."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "db_path": {"type": "string"},
+                            "query": {"type": "string"},
+                            "file_out": {"type": "string"}
+                        },
+                        "required": ["db_path", "query", "file_out"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "scrape_website",
+                    "description": (
+                        "Extract data from a website by URL, write to file_out."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string"},
+                            "file_out": {"type": "string"}
+                        },
+                        "required": ["url", "file_out"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "compress_image",
+                    "description": (
+                        "Compress or resize an image, writing the output back to file_out."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "src_path": {"type": "string"},
+                            "file_out": {"type": "string"},
+                            "width": {"type": "number"},
+                            "height": {"type": "number"}
+                        },
+                        "required": ["src_path", "file_out"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "transcribe_audio",
+                    "description": (
+                        "Transcribe an MP3 file using a local or remote STT engine."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "src_path": {"type": "string"},
+                            "file_out": {"type": "string"}
+                        },
+                        "required": ["src_path", "file_out"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "md_to_html",
+                    "description": (
+                        "Convert Markdown in file_in to HTML, writing to file_out."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "file_in": {"type": "string"},
+                            "file_out": {"type": "string"}
+                        },
+                        "required": ["file_in", "file_out"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "filter_csv_endpoint",
+                    "description": (
+                        "Load a CSV, filter it, and return JSON data. Writes result to file_out or outputs JSON directly."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "csv_path": {"type": "string"},
+                            "filters": {"type": "object"},
+                            "file_out": {"type": "string"}
+                        },
+                        "required": ["csv_path", "filters", "file_out"]
+                    }
+                }
             }
         ],
         "tool_choice": "auto"
@@ -407,6 +558,7 @@ def run_task(
 
             # A5: recent_logs
             elif fn_name == "recent_logs":
+                import os
                 logs_dir = fn_args["logs_dir"]
                 output_file = fn_args["output_file"]
                 try:
@@ -441,6 +593,7 @@ def run_task(
 
             # A6: docs_index
             elif  fn_name == "docs_index":
+                import os
                 docs_dir = fn_args["docs_dir"] 
                 output_file = fn_args["output_file"] 
                 index_map = {}
@@ -704,8 +857,250 @@ def run_task(
                 except Exception as e:
                     raise HTTPException(status_code=500, detail=f"DB error: {str(e)}")
 
+            #B3 fetch_data_api
+            elif fn_name == "fetch_data_api":
+                import httpx 
+                url = fn_args["url"]
+                file_out = fn_args["file_out"]
+                try:
+                    # fetch data
+                    r = httpx.get(url, timeout=10)
+                    r.raise_for_status()
+                    data = r.content  # or .text
+
+                    # save to file_out in /data
+                    with safe_open(file_out, "wb") as f_out:
+                        f_out.write(data)
+
+                    outputs.append(f"[fetch_data_api] Saved data from {url} to {file_out}")
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"fetch_data_api error: {str(e)}")
 
 
+            #B4 clone_git_repo
+            elif fn_name == "clone_git_repo":
+                from pathlib import Path
+                repo_url = fn_args["repo_url"]
+                commit_msg = fn_args.get("commit_message")
+
+                # Directory where we'll clone repositories under /data
+                repos_dir = "/data/repos"
+                os.makedirs(repos_dir, exist_ok=True)
+
+                # Derive a local folder name from the repo URL
+                repo_name = repo_url.rstrip("/").split("/")[-1]
+                if repo_name.endswith(".git"):
+                    repo_name = repo_name[:-4]
+
+                local_repo_path = os.path.join(repos_dir, repo_name)
+
+                try:
+                    # Clone the repo into /data/repos/<repo_name>
+                    subprocess.run(["git", "clone", repo_url, local_repo_path], check=True)
+
+                    # If a commit message is provided, make an empty commit in the cloned repo
+                    if commit_msg:
+                        # Navigate via -C <path>, allow an empty commit for demonstration
+                        subprocess.run(
+                            ["git", "-C", local_repo_path, "commit", "--allow-empty", "-m", commit_msg],
+                            check=True
+                        )
+                        outputs.append(
+                            f"[clone_git_repo] Cloned '{repo_url}' into '{local_repo_path}' and made an empty commit: {commit_msg}"
+                        )
+                    else:
+                        outputs.append(f"[clone_git_repo] Successfully cloned '{repo_url}' into '{local_repo_path}'.")
+
+                except subprocess.CalledProcessError as e:
+                    raise HTTPException(status_code=500, detail=f"clone_git_repo error: {str(e)}")
+
+            
+            #B5 sql_query
+            elif fn_name == "sql_query": 
+                import sqlite3 
+                db_path = fn_args["db_path"] 
+                query = fn_args["query"] 
+                file_out = fn_args["file_out"] 
+                try: 
+                    conn = sqlite3.connect(db_path) 
+                    cur = conn.cursor() 
+                    cur.execute(query) 
+                    results = cur.fetchall() 
+                    conn.close()
+                        # Save results to JSON or CSV, etc.
+                    
+                    with safe_open(file_out, "w", encoding="utf-8") as f_out:
+                        json.dump(results, f_out)
+
+                    outputs.append(f"[sql_query] Executed query, wrote {len(results)} rows to {file_out}")
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"sql_query error: {str(e)}")
+
+
+            #B6 scrape_website
+            elif fn_name == "scrape_website": 
+                import httpx 
+                import re 
+                url = fn_args["url"] 
+                file_out = fn_args["file_out"] 
+                try: 
+                    r = httpx.get(url, timeout=10) 
+                    r.raise_for_status() 
+                    content = r.text
+                        # minimal placeholder for extracting something
+                    # real logic would parse HTML with e.g. BeautifulSoup
+                    with safe_open(file_out, "w", encoding="utf-8") as f_out:
+                        f_out.write(content)
+
+                    outputs.append(f"[scrape_website] Scraped {url}, wrote raw HTML to {file_out}")
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"scrape_website error: {str(e)}")
+
+
+            #B7 compress_image
+            elif fn_name == "compress_image": 
+                from PIL import Image 
+                src_path = fn_args["src_path"] 
+                file_out = fn_args["file_out"] 
+                width = fn_args.get("width") 
+                height = fn_args.get("height")
+                try:
+                    # Save compressed/resized to file_out
+                    with safe_open(file_out, "wb") as f_out:
+                        img.save(f_out, format="JPEG", quality=85)
+                    # If both width and height are provided, resize
+                    # (If not provided, we just leave the image at its original size)
+                    if width and height:
+                        # Convert to int in case they come as strings
+                        new_width = int(width)
+                        new_height = int(height)
+
+                        # ANTIALIAS is now called Resampling in newer Pillow versions
+                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                    # Write the resized/compressed image to file_out
+                    # Choose a format, e.g. JPEG, and set a quality
+                    with safe_open(file_out, "wb") as f_out:
+                        img.save(f_out, format="JPEG", quality=85)
+                    outputs.append(f"[compress_image] Resized image from {src_path} -> {file_out}")
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"compress_image error: {str(e)}")
+
+
+            #B8 transcribe_audio
+            elif fn_name == "transcribe_audio": 
+                import speech_recognition as sr
+                src_path = fn_args["src_path"]
+                file_out = fn_args["file_out"]
+
+                try:
+                    # We'll trust that src_path is under /data. 
+                    # If you want to enforce it, you can do a quick check with safe_open in read mode:
+                    with safe_open(src_path, "rb"):
+                        pass  # Just to confirm path is valid & within /data
+
+                    # Initialize recognizer
+                    r = sr.Recognizer()
+
+                    # The AudioFile class expects a file path, so we pass src_path directly
+                    with sr.AudioFile(src_path) as source:
+                        audio_data = r.record(source)  # read the entire audio file
+
+                    # Perform speech-to-text using Google's free API or any other local STT engine
+                    text = r.recognize_google(audio_data)
+
+                    # Write the transcription to file_out
+                    with safe_open(file_out, "w", encoding="utf-8") as f_out:
+                        f_out.write(text)
+
+                    outputs.append(
+                        f"[transcribe_audio] Transcribed audio from '{src_path}' -> '{file_out}'"
+                    )
+
+                except sr.UnknownValueError:
+                    raise HTTPException(
+                        status_code=500, 
+                        detail="Could not understand the audio (speech_recognition UnknownValueError)."
+                    )
+                except sr.RequestError as e:
+                    raise HTTPException(
+                        status_code=500, 
+                        detail=f"API Request error during transcription: {str(e)}"
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500, 
+                        detail=f"transcribe_audio error: {str(e)}"
+                    )
+
+                
+            #B9 md_to_html
+            elif fn_name == "md_to_html":
+                import markdown
+                file_in = fn_args["file_in"]
+                file_out = fn_args["file_out"]
+
+                try:
+                    # 1) Read the Markdown from file_in
+                    with safe_open(file_in, "r", encoding="utf-8") as f_in:
+                        md_text = f_in.read()
+
+                    # 2) Convert to HTML
+                    html = markdown.markdown(md_text)
+
+                    # 3) Write the HTML to file_out
+                    with safe_open(file_out, "w", encoding="utf-8") as f_out:
+                        f_out.write(html)
+
+                    outputs.append(
+                        f"[md_to_html] Converted '{file_in}' to HTML in '{file_out}'"
+                    )
+
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"md_to_html error: {str(e)}"
+                    )
+
+            #B10 filter_csv_endpoint
+            elif fn_name == "filter_csv_endpoint":
+                import csv
+                csv_path = fn_args["csv_path"]
+                filters = fn_args["filters"]  # e.g. {"column_name": "value"}
+                file_out = fn_args["file_out"]
+
+                try:
+                    # 1) Read CSV from /data
+                    with safe_open(csv_path, "r", encoding="utf-8") as f_in:
+                        reader = csv.DictReader(f_in)
+                        rows = list(reader)
+
+                    # 2) Apply each filter
+                    filtered = []
+                    for row in rows:
+                        match = True
+                        for col, val in filters.items():
+                            if str(row.get(col, "")) != str(val):
+                                match = False
+                                break
+                        if match:
+                            filtered.append(row)
+
+                    # 3) Write filtered rows to JSON in /data
+                    with safe_open(file_out, "w", encoding="utf-8") as f_out:
+                        json.dump(filtered, f_out, ensure_ascii=False, indent=2)
+
+                    outputs.append(
+                        f"[filter_csv_endpoint] Found {len(filtered)} matching rows; wrote them to '{file_out}'"
+                    )
+
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"filter_csv_endpoint error: {str(e)}"
+                    )
+
+                outputs.append("[clone_git_repo] Placeholder logic executed.")
             else:
                 outputs.append(f"[Unknown tool: {fn_name}]")
 
