@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dateutil.parser import parse
 import openai
 
-DATA_ROOT = os.path.abspath("C:/Users/yadavallishiva_ramak/Downloads/TDS project/data") # Adjust if running on Windows (e.g. "C:/data")
+DATA_ROOT = os.path.abspath("C:/data") # Adjust if running on Windows (e.g. "C:/data")
 def is_within_data_root(path: str) -> bool:
     """ Returns True if 'path' is within DATA_ROOT, False otherwise. """ 
     abs_path = os.path.abspath(path) 
